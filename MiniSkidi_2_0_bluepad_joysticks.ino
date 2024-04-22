@@ -182,12 +182,28 @@ void moveCar(ControllerPtr ctl, int inputValue)
 
 void bucketTilt(int bucketServoValue)
 {
-  bucketServo.write(bucketServoValue);
+  int pulseWidth = map(bucketServoValue, 0, 180, 600, 2500); // Adjust the range as needed
+  
+  // Write the pulse width to the servo to control its speed
+  bucketServo.writeMicroseconds(pulseWidth);
+  
+  // Reduce the delay to speed up the movement
+  delay(2); // Adjust the delay as needed (lower values for faster movement)
 }
+
+
 void auxControl(int auxServoValue)
 {
-  auxServo.write(auxServoValue);
+  // Map the auxServoValue to the appropriate range of microseconds
+  int pulseWidth = map(auxServoValue, 0, 180, 600, 2500); // Adjust the range as needed
+  
+  // Write the pulse width to the servo to control its speed
+  auxServo.writeMicroseconds(pulseWidth);
+  
+  // Add a delay to control the speed of the servo movement
+  delay(2); // Adjust the delay as needed
 }
+
 void lightControl()
 {
   Serial.println("Toggling lights!");
@@ -336,36 +352,47 @@ void dumpBalanceBoard(ControllerPtr ctl) {
                    ctl->temperature()   // temperature: used to adjust the scale value's precision
     );
 }
-void increment_bucket(ControllerPtr ctl,int increment)
+void increment_bucket(ControllerPtr ctl, int increment)
 {
-  int button_delay = 1;
-  bucket_pos += increment;
+  // Adjust the step size to control the speed
+  int stepSize = 5; // Increase step size for faster movement
+  
+  bucket_pos += increment * stepSize;
+  
   if(bucket_pos < 150 && bucket_pos > 0)
   {
-  bucketTilt(bucket_pos);
-  //delay(button_delay);
+    bucketTilt(bucket_pos);
+    // Reduce the delay to speed up the movement
+    delay(10); // Adjust the delay as needed (lower values for faster movement)
   }
   else
   {
     //ctl->setRumble(0x01 /* force */, 0x01 /* duration */);
-    bucket_pos -= increment;
+    bucket_pos -= increment * stepSize;
   }
 }
 
 void increment_claw(ControllerPtr ctl, int increment)
 {
-  aux_pos += increment;
-  if(aux_pos < 110 && aux_pos > 40)
+  // Adjust the step size to control the speed
+  int stepSize = 5; // Increase step size for faster movement
+  
+  aux_pos += increment * stepSize;
+  
+  if (aux_pos < 110 && aux_pos > 40)
   {
     auxControl(aux_pos);
-    //delay(button_delay);
+    // Reduce the delay to speed up the movement
+    delay(10); // Adjust the delay as needed (lower values for faster movement)
   }
   else
   {
     //ctl->setRumble(0x01 /* force */, 0x01 /* duration */);
-    aux_pos -= increment;
+    aux_pos -= increment * stepSize;
   }
 }
+
+
 
 
 void processGamepad(ControllerPtr ctl) {
@@ -374,17 +401,26 @@ void processGamepad(ControllerPtr ctl) {
     //  a(), b(), x(), y(), l1(), etc...
     int move_command = STOP;
 
-    int minimal_control_input_bucket = 100;
+   int deadzone = 300; // Adjust as needed
+
+    int minimal_control_input_bucket = 300;
     int right_x = ctl->axisRX();       // (-511 - 512) right X axis
-    int right_y =ctl->axisRY();       // (-511 - 512) right Y axis
-    if (abs(right_y)>=minimal_control_input_bucket)
-    {
+    int right_y = ctl->axisRY();       // (-511 - 512) right Y axis
+    if (abs(right_y) >= minimal_control_input_bucket) {
         if (right_y > 0) move_command = ARMUP;
         if (right_y < 0) move_command = ARMDOWN;
+    } else if (abs(right_y) < deadzone) {
+        // Ignore small joystick movements within the deadzone
+        move_command = STOP;
     }
 
     // THis codeblock moves the bucket via joysticks
-    if (abs(right_x)>=minimal_control_input_bucket)
+    if (abs(right_x) >= minimal_control_input_bucket) {
+        // Handle bucket movement
+    } else if (abs(right_x) < deadzone) {
+        // Ignore small joystick movements within the deadzone
+    }
+
     {
       int n_steps = right_x/200; // Scale to appropriate speed
       Serial.println("Incrementing bucket ");
@@ -400,18 +436,17 @@ void processGamepad(ControllerPtr ctl) {
 
     }
 
-    // This code block moves the claw via R2 and L2
-    int throttle = ctl->throttle();
+     int throttle = ctl->throttle();
     int brake = ctl->brake();
-    if (abs(throttle)>=minimal_control_input_bucket)
+    if (throttle != 0)
     {
-      int n_steps = throttle/400;
-      increment_claw(ctl,-1*n_steps);
+      int n_steps = throttle / 600;
+      increment_claw(ctl, -1 * n_steps);
     }
-    if (abs(brake)>=minimal_control_input_bucket)
+    if (brake != 0)
     {
-      int n_steps = brake/700;
-      increment_claw(ctl,n_steps);
+      int n_steps = brake / 700;
+      increment_claw(ctl, n_steps);
     }
 
     if(ctl->b())
